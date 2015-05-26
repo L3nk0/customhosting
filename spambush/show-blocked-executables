@@ -1,0 +1,19 @@
+#!/bin/bash
+log="/var/log/mail.log"
+
+if [ $# -eq 0 ]; then
+	echo "No arguments supplied. Run the script with the arguments 'today' or 'yesterday'"
+	exit
+fi
+day=""
+space=""
+if [ "$1" == "today" ]; then day="today"; fi
+if [ "$1" == "yesterday" ]; then day="yesterday"; fi
+if [ "$day" == "" ]; then echo "Incorrect argument supplied. Run the script with the arguments 'today' or 'yesterday'"; exit; fi
+d="$(date -d $day | awk '{print $3}')"
+m="$(date -d $day | awk '{print $2}')"
+if [ "${#d}" == "1"  ]; then space="  " ; fi
+if [ "${#d}" == "2"  ]; then space=" "; fi
+
+thisday="${m}${space}${d}"
+cat $log | grep $thisday | egrep '(zen.spamhaus.org|bl.spamcop.net|psbl.surriel.com|b.barracudacentral.org)' | grep NOQUEUE | wc -l

@@ -1,0 +1,29 @@
+#!/bin/bash
+if [ $# -eq 0 ]; then
+        echo "No arguments supplied. Run the script with the arguments 'today' or 'yesterday'"
+        exit
+fi
+
+networks=$(virsh net-list --all | grep -Ev '(---|Persistent|$^)' | awk '{print $1}')
+for network in $networks; do
+	if [ "$network" -eq "$1" ]; then
+		if [ "$(virsh net-dumpxml $network | grep openvswitch)" ]; then
+			echo "$network is an openvswitch device" 
+		else
+			echo "$network is not an openvswitch device"
+		fi
+	else
+		echo "Network '$network' doesn't exist"
+		exit
+	fi
+done
+
+
+
+
+#networks=$(virsh net-list --all | grep -Ev '(---|Persistent|$^)' | awk '{print $1}')
+#for network in $networks; do
+#	if [ "$(virsh net-dumpxml $network | grep openvswitch)" ]; then
+#		echo "$network is a openvswitch device" 
+#	fi
+#done

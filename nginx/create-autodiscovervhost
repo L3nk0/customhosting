@@ -1,0 +1,31 @@
+#!/bin/bash
+available="/etc/nginx/sites-available/"
+if [ $# -eq 0 ]; then
+	echo "No arguments supplied. Run the script with the name of the new vhost"
+	 exit
+fi
+site="$1"
+if [ "$(echo $site | cut -d '.' -f 1)" = "autodiscover" ]; then
+	if [ "$(ls -lh $available | grep "$site")" ]; then
+	        echo "ERROR: found file '${available}${site}'. Exiting!"
+	        exit
+	else
+	        cp ${available}template.site ${available}${site}
+		if [ "$(ls -lh $available | grep "$site")" ]; then
+			sed -i "s/autodiscover.somedomain.com.au/$site/g" "${available}${site}"
+			if [ "$(cat ${available}${site} | grep $site)" ]; then
+				echo "INFO: Site vhost file created succesfully. Please run the './scripts/enable-vhost' script when you want to make the site available."
+				exit
+			else
+				echo "ERROR: Something went wrong, the 'sed' command failed to update the 'server_name' attribute. Exiting!"
+				exit
+			fi
+		else
+			echo "ERROR: Copy of '${available}template.site' to '${available}${site}' failed. Exiting!"
+			exit
+		fi
+	fi
+else
+	echo "ERROR: This script is only for creating autodiscover vhosts, so the domain MUST start with 'autodiscover'. Exiting!"
+	exit
+fi

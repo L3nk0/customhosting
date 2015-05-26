@@ -1,0 +1,37 @@
+#!/bin/bash
+available="/etc/nginx/sites-available/"
+enabled="/etc/nginx/sites-enabled/"
+if [ $# -eq 0 ]; then
+	echo "No arguments supplied. Run the script with the name of a vhost file in the '${enabled}' directory"
+	 exit
+fi
+site="$1"
+if [ "$(ls -lh $available | grep "$site")" ]; then
+	echo "INFO: found file '${available}${site}'"
+	if [ "$(ls -lh $enabled | grep "$site")" ]; then
+		echo "INFO: Site '${enabled}${site}' is enabled. Removing the link..."
+		rm ${enabled}${site}
+		if [ "$(ls -lh $enabled | grep "$site")" ]; then
+			echo "ERROR: Something went wrong, the link is still there. Exiting!"
+			exit
+		else
+			echo "INFO: Link removed, verifying nginx configuation..."
+			nginx -t > /dev/null 2>&1
+			if [ "$?" = "0" ]; then
+				echo "INFO: nginx configuration verified. Restarting nginx.."
+				service nginx restart
+			else
+				echo "WARNING: nginx configuration failed to verify. Refer to the following text for cause:"
+				echo ""
+				nginx -t
+				exit
+			fi
+		fi
+	else
+		echo "WARNING: file '${enabled}${site}' doesn't exist. Exiting!"
+		exit
+	fi
+else
+	echo "WARNING: file '${available}${site}' doesn't exist. Exiting!"
+	exit
+fi

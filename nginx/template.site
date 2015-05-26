@@ -1,0 +1,11 @@
+server {
+    listen 80;
+
+	# Change below here
+
+    server_name autodiscover.somedomain.com.au; 
+
+	# Dont change below here
+
+    return 302 https://autodiscover.yourexchangehostdomain.com.au/AutoDiscover/AutoDiscover.xml;
+}

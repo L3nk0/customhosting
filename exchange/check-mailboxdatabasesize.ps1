@@ -3,6 +3,7 @@
 #[NRPE Handlers]
 #check_exmbdbsize=cmd /c echo C:\Scripts\Nagios\Check-MailboxDatabaseSize.ps1 | PowerShell.exe -Command -
 #
+#
 # On the check_nrpe command include the -t 30, since it takes some time to load the Exchange cmdlet's.
 
 Add-PsSnapin Microsoft.Exchange.Management.PowerShell.E2010

@@ -1,29 +1,76 @@
 #!/bin/bash
-if [ $# -eq 0 ]; then
-        echo "No arguments supplied. Run the script with the arguments 'today' or 'yesterday'"
-        exit
-fi
 
-networks=$(virsh net-list --all | grep -Ev '(---|Persistent|$^)' | awk '{print $1}')
-for network in $networks; do
-	if [ "$network" -eq "$1" ]; then
-		if [ "$(virsh net-dumpxml $network | grep openvswitch)" ]; then
-			echo "$network is an openvswitch device" 
-		else
-			echo "$network is not an openvswitch device"
-		fi
-	else
-		echo "Network '$network' doesn't exist"
-		exit
-	fi
+PROGNAME="ovs-addvlan"
+REVISION="0.0.1"
+
+function print_usage {
+cat <<EOF
+  NAME
+    $PROGNAME - add vlan to openvswitch network
+
+  SYNOPSIS
+    ovs-vlan [-n <name>] [-v <vlanid>] [-p <portgroup name>] [-V] [-h]
+
+  DESCRIPTION
+    Use to add a VLAN to an existing and active OpenVSwitch based Libvirt network.
+
+  OPTIONS
+    [-n] <string>  Libvirt network name. Must be an openvswitch network
+    [-v] <string>  VLAN ID to add to Libvirt network. Must be unique to the libvirt network
+    [-p] <string>  Name of the Portgroup for the VLAN. Must be unique to the libvirt network
+    [-V]           Shows the version information
+    [-h]           Shows this message
+
+EOF
+}
+
+function print_version {
+        echo "$PROGNAME $REVISION"
+        echo "Ben Vincent - https://github.com/neoloc/customhosting"
+}
+
+function check_network {
+  virsh net-info $1 > /dev/null 2>&1
+  if [ $? -eq 1 ]; then
+    echo "Network: $1 not found"
+    return 1
+  elif [ -n "$(virsh net-dumpxml $1 | grep openvswitch)" ]; then
+    NETWORK=$1
+  elif [ -z "$(virsh net-dumpxml $1 | grep openvswitch)" ]; then
+    echo "Network: $1 not an openvswitch network"
+    return 1
+  else
+    echo "ERROR: Something went wrong, should not get here. Function 'check_network'"
+    return 2
+  fi
+}
+
+#function check_vlan {
+#}
+
+#function check_portgroup {
+#}
+
+while getopts ":V:h:n:v:p" optname
+    do
+      case "$optname" in
+        V) print_version; exit 2 ;;
+        h) print_usage; exit 2;;
+        n) TEMP_NETWORK=${OPTARG};;
+        v) TEMP_VLAN=${OPTARG};;
+        p) TEMP_PORTGROUP=${OPTARG};;
+        *)
+        # Should not occur
+          echo "Unknown error while processing options"
+          ;;
+      esac
 done
 
-
-
-
-#networks=$(virsh net-list --all | grep -Ev '(---|Persistent|$^)' | awk '{print $1}')
-#for network in $networks; do
-#	if [ "$(virsh net-dumpxml $network | grep openvswitch)" ]; then
-#		echo "$network is a openvswitch device" 
-#	fi
-#done
+if [ -n $TEMP_NETWORK ]; then
+  check_network $TEMP_NETWORK
+  if [ $? -eq 0 ] && [ -n $TEMP_VLAN ]; then
+    check_vlan $TEMP_VLAN
+    # more to come!
+  fi
+elif [ -z $TEMP_NETWORK ]; then echo "ERROR: Network not set"; print_usage
+fi

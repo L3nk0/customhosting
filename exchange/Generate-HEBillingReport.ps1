@@ -1,7 +1,6 @@
 ﻿# Import modules and snapins
-if ( (Get-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue) -eq $null ){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.E2010}else{Write-Host -BackgroundColor Black -ForegroundColor Red "The MSExchange 2010 Management tools do not appear to be installed! Exiting."; exit}
-if ( (Get-module -Name ActiveDirectory -ErrorAction SilentlyContinue) -eq $null ){Get-module ActiveDirectory}else{Write-Host -BackgroundColor Black -ForegroundColor Red "The MSActiveDirectory module to not appear to be installed! Exiting."; exit}
-
+if ( (Get-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue) -eq $null ){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.E2010}
+if ( (Get-module -Name ActiveDirectory -ErrorAction SilentlyContinue) -eq $null ){Import-module ActiveDirectory}
 
 # Static Variables
 $hostedExchange_ClientOU="HostedClients"  # relative OU to root of domain

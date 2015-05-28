@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PROGNAME="ovs-addvlan"
-REVISION="0.0.1"
+REVISION="0.0.2"
 
 function print_usage {
 cat <<EOF
@@ -22,6 +22,7 @@ cat <<EOF
     [-h]           Shows this message
 
 EOF
+exit 2
 }
 
 function print_version {
@@ -45,11 +46,29 @@ function check_network {
   fi
 }
 
-#function check_vlan {
-#}
+function check_vlan {
+  virsh net-dumpxml ovs-network | grep "tag id='${1}'" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "VLAN: $1 on Network: $NETWORK already exists"
+    return 1
+  elif [ "$1" -le 0 -a "$1" -ge 4097 ]; then
+    echo "VLAN: $1 on is outside the VLAN Specification range. 1 to 4096"
+    return 1
+  elif [ "$1" -eq 1 ]; then
+    echo "VLAN: $1 is the default vlan and already exists"
+    return 1
+  else
+    VLAN=$1
+}
 
-#function check_portgroup {
-#}
+function check_portgroup {
+  virsh net-dumpxml ovs-network | grep "portgroup name='${1}'" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "PortGroup: $1 on Network: $NETWORK already exists"
+    return 1
+  else
+  PORTGROUP=$1
+}
 
 while getopts ":V:h:n:v:p" optname
     do
@@ -68,9 +87,14 @@ done
 
 if [ -n $TEMP_NETWORK ]; then
   check_network $TEMP_NETWORK
-  if [ $? -eq 0 ] && [ -n $TEMP_VLAN ]; then
+  if [ $? -eq 0 ] && [ -n $NETWORK ] && [ -n $TEMP_VLAN ]; then
     check_vlan $TEMP_VLAN
-    # more to come!
+    if [ $? -eq 0 ] && [ -n $VLAN ] && [ -n $TEMP_PORTGROUP ]; then
+      check_portgroup $TEMP_PORTGROUP
+      if [ $? -eq 0 ] && [ -n $PORTGROUP ] && [ -n $TEMP_PORTGROUP ]; then
+    elif [ -z $TEMP_PORTGROUP ]; then echo "ERROR: PortGroup not set"; print_usage
+    fi
+  elif [ -z $TEMP_VLAN ]; then echo "ERROR: VLAN not set"; print_usage
   fi
 elif [ -z $TEMP_NETWORK ]; then echo "ERROR: Network not set"; print_usage
 fi

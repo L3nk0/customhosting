@@ -43,7 +43,7 @@ if ($NagiosStatus -eq "2") {
 } elseif ($NagiosStatus -eq "1") {
 	Write-Host "WARNING: " $NagiosDescription
 } else {
-	Write-Host "OK: All mail queues within limits."
+	Write-Host "OK: All mailbox databases are within limits."
 }
 
 exit $NagiosStatus

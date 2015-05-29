@@ -4,97 +4,120 @@ PROGNAME="ovs-addvlan"
 REVISION="0.0.2"
 
 function print_usage {
-cat <<EOF
+  cat <<EOF
   NAME
     $PROGNAME - add vlan to openvswitch network
 
   SYNOPSIS
-    ovs-vlan [-n <name>] [-v <vlanid>] [-p <portgroup name>] [-V] [-h]
+    $PROGNAME [-n <name>] [-v <vlanid>] [-p <portgroup name>] [-V] [-h]
 
   DESCRIPTION
     Use to add a VLAN to an existing and active OpenVSwitch based Libvirt network.
 
   OPTIONS
-    [-n] <string>  Libvirt network name. Must be an openvswitch network
-    [-v] <string>  VLAN ID to add to Libvirt network. Must be unique to the libvirt network
-    [-p] <string>  Name of the Portgroup for the VLAN. Must be unique to the libvirt network
-    [-V]           Shows the version information
-    [-h]           Shows this message
+    [-n <network>] 	Libvirt network name. Must be an openvswitch network
+    [-v <vlan>] 	VLAN ID to add to Libvirt network.
+    [-p <portgroup>]	Name of the Portgroup for the VLAN.
+    [-V, --version]	Shows the version information
+    [-h, --help]	Shows this message
 
 EOF
-exit 2
+  exit 2
 }
 
 function print_version {
-        echo "$PROGNAME $REVISION"
-        echo "Ben Vincent - https://github.com/neoloc/customhosting"
+  echo "$PROGNAME $REVISION"
+  echo "Ben Vincent - https://github.com/neoloc/customhosting"
+  exit 2
 }
 
-function check_network {
-  virsh net-info $1 > /dev/null 2>&1
+function print_gethelp {
+  echo ""
+  echo "Something went wrong, read the above message for more information."
+  echo "Additionally you can get help by running '$PROGNAME -h'"
+  exit 2
+}
+
+function set_network {
+  virsh net-info $TEMP_NETWORK > /dev/null 2>&1
   if [ $? -eq 1 ]; then
-    echo "Network: $1 not found"
-    return 1
-  elif [ -n "$(virsh net-dumpxml $1 | grep openvswitch)" ]; then
-    NETWORK=$1
-  elif [ -z "$(virsh net-dumpxml $1 | grep openvswitch)" ]; then
-    echo "Network: $1 not an openvswitch network"
-    return 1
+    echo "Network not found"
+    exit 1
+  elif [ -n "$(virsh net-dumpxml $TEMP_NETWORK | grep openvswitch)" ]; then
+    NETWORK=$TEMP_NETWORK
+  elif [ -z "$(virsh net-dumpxml $TEMP_NETWORK | grep openvswitch)" ]; then
+    echo "Network: $TEMP_NETWORK not an openvswitch network"
+    exit 1
   else
-    echo "ERROR: Something went wrong, should not get here. Function 'check_network'"
-    return 2
+    echo "ERROR: Something went wrong, should not get here. Function 'set_network'"
+    exit 2
   fi
 }
 
-function check_vlan {
-  virsh net-dumpxml ovs-network | grep "tag id='${1}'" > /dev/null 2>&1
+function set_vlan {
+  virsh net-dumpxml ovs-network | grep "tag id='${TEMP_VLAN}'" > /dev/null 2>&1
   if [ $? -eq 0 ]; then
-    echo "VLAN: $1 on Network: $NETWORK already exists"
-    return 1
-  elif [ "$1" -le 0 -a "$1" -ge 4097 ]; then
-    echo "VLAN: $1 on is outside the VLAN Specification range. 1 to 4096"
-    return 1
-  elif [ "$1" -eq 1 ]; then
-    echo "VLAN: $1 is the default vlan and already exists"
-    return 1
+    echo "VLAN: $TEMP_VLAN on Network: $NETWORK already exists"
+    exit 1
+  elif [ $TEMP_VLAN -le 0 ] && [ $TEMP_VLAN -ge 4097 ]; then
+    echo "VLAN: $TEMP_VLAN on is outside the VLAN Specification range. 1 to 4096"
+    exit 1
+  elif [ $TEMP_VLAN -eq 1 ]; then
+    echo "VLAN: $TEMP_VLAN is the default vlan and already exists"
+    exit 1
   else
-    VLAN=$1
+    VLAN=$TEMP_VLAN
+  fi
 }
 
-function check_portgroup {
-  virsh net-dumpxml ovs-network | grep "portgroup name='${1}'" > /dev/null 2>&1
+function set_portgroup {
+  virsh net-dumpxml ovs-network | grep "portgroup name='${TEMP_PORTGROUP}'" > /dev/null 2>&1
   if [ $? -eq 0 ]; then
-    echo "PortGroup: $1 on Network: $NETWORK already exists"
-    return 1
+    echo "PortGroup: $TEMP_PORTGROUP on Network: $NETWORK already exists"
+    exit 1
   else
-  PORTGROUP=$1
+  PORTGROUP=$TEMP_PORTGROUP
+  fi
 }
 
-while getopts ":V:h:n:v:p" optname
-    do
-      case "$optname" in
-        V) print_version; exit 2 ;;
-        h) print_usage; exit 2;;
-        n) TEMP_NETWORK=${OPTARG};;
-        v) TEMP_VLAN=${OPTARG};;
-        p) TEMP_PORTGROUP=${OPTARG};;
-        *)
-        # Should not occur
-          echo "Unknown error while processing options"
-          ;;
-      esac
+# Check if there are any arguments
+if [[ $# -eq 0 ]]; then
+  echo "No arguments supplied"
+  print_gethelp
+  exit 1
+fi
+
+# Set some temporary variables
+TEMP_NETWORK="z"
+TEMP_VLAN="z"
+TEMP_PORTGROUP="z"
+
+# Get flags and options
+while getopts 'Vhn:v:p:' flag; do
+  case "${flag}" in
+    n) TEMP_NETWORK="${OPTARG}";;
+    v) TEMP_VLAN="${OPTARG}";;
+    p) TEMP_PORTGROUP="${OPTARG}";;
+    V) print_version ;;
+    h) print_usage ;;
+  esac
 done
 
-if [ -n $TEMP_NETWORK ]; then
-  check_network $TEMP_NETWORK
-  if [ $? -eq 0 ] && [ -n $NETWORK ] && [ -n $TEMP_VLAN ]; then
-    check_vlan $TEMP_VLAN
-    if [ $? -eq 0 ] && [ -n $VLAN ] && [ -n $TEMP_PORTGROUP ]; then
-      check_portgroup $TEMP_PORTGROUP
-      if [ $? -eq 0 ] && [ -n $PORTGROUP ] && [ -n $TEMP_PORTGROUP ]; then
-    elif [ -z $TEMP_PORTGROUP ]; then echo "ERROR: PortGroup not set"; print_usage
-    fi
-  elif [ -z $TEMP_VLAN ]; then echo "ERROR: VLAN not set"; print_usage
+# Check the arguments were stored in the variables
+if [ "$TEMP_NETWORK" = "z" ]; then echo "ERROR: Network not set."; print_gethelp; fi
+if [ "$TEMP_VLAN" = "z" ]; then echo "ERROR: VLAN not set."; print_gethelp; fi
+if [ "$TEMP_PORTGROUP" = "z" ]; then echo "ERROR: Portgroup not set."; print_gethelp; fi
+
+# Process
+set_network
+set_vlan
+set_portgroup
+if [ -n $NETWORK ] && [ -n $VLAN ] && [ -n $PORTGROUP ]; then
+  echo "All ok, ready to add the vlan"
+  virsh net-update $NETWORK add portgroup --xml "<portgroup name='${PORTGROUP}'><vlan><tag id='${VLAN}'/></vlan></portgroup>" --live --config
+  if [ $? -eq 0 ]; then
+    echo "INFO - VLAN '$VLAN' has been created as portgroup '$PORTGROUP' on network '$NETWORK'"
+  else
+    echo "ERROR - VLAN '$VLAN' failed to be created as portgroup '$PORTGROUP' on network '$NETWORK'"
   fi
-elif [ -z $TEMP_NETWORK ]; then echo "ERROR: Network not set"; print_usage
 fi

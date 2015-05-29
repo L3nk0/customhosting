@@ -121,7 +121,6 @@ function Get-CustomerShortname($custName){
 
 
 # Static Variables
-$wordlist="C:\Manage\Scripts\words.csv"                # Path to a csv full of words. See ftp://10.20.30.211/clientfiles/words.csv
 $hostedExchange_ClientOU="HostedClients"               # relative OU to root of domain
 $LogFile="C:\manage\scripts\new-hecontact.log"         # log all messages to this location
 $allReports= @()                                       # Somewhere to store reports
@@ -133,7 +132,7 @@ $ad = Get-ADDomain
 $hostedExchange_domain = $ad.DNSroot
 $hostedExchange_baseDN = "OU=" + $hostedExchange_ClientOU + "," + $ad.DistinguishedName
 $hostedExchange_baseOU =  $hostedExchange_domain + "/" + $hostedExchange_ClientOU
-$userOU = ("OU=Users,OU=" + $BusinessName + "," + $hostedExchange_baseDN)
+$contactOU = ($hostedExchange_baseOU + "\" + $BusinessName + "\Contacts")
 #
 # --> Select Domain Controller
 $hostedExchange_dchost=$(Select-MyDomainController)

@@ -2,6 +2,8 @@
 
 PROGNAME="ovs-showtrunks"
 REVISION="0.0.2"
+OVS_PROGS="~/Projects/customhosting/vmm"	# Location of other ovs scripts
+PATH=$OVS_PROGS:$PATH				# Update $PATH for this switches context
 
 function print_usage {
   cat <<EOF
@@ -16,8 +18,8 @@ function print_usage {
 
   OPTIONS
     [-n <network>] 	Libvirt network name. Must be an openvswitch network
-    [-V, --version]	Shows the version information
-    [-h, --help]	Shows this message
+    [-V]		Shows the version information
+    [-h]		Shows this message
 
 EOF
   exit 2
@@ -92,13 +94,13 @@ if [ -n $NETWORK ] ; then
       COUNT=0
       for VLAN in $(sed -n "/<portgroup name='${TRUNK}'>/,/<\/portgroup>/p" $DUMPFILE | grep "<tag id='" | awk -F\' '{print $2}'); do
 	if [ $COUNT -eq 0 ]; then
-	  ALLVLANS="$VLAN"
+	  ALLVLANS="\"$VLAN\""
 	else
-	  ALLVLANS="$ALLVLANS, $VLAN"
+	  ALLVLANS="$ALLVLANS,\"$VLAN\""
 	fi
 	COUNT=$[$COUNT +1]
       done
-  echo -e "\t$TRUNK\t\t$ALLVLANS"
+  echo -e "\t\"$TRUNK\"\t\t$ALLVLANS"
   done
 echo ""
 fi

@@ -2,6 +2,8 @@
 
 PROGNAME="ovs-showvlans"
 REVISION="0.0.2"
+OVS_PROGS="~/Projects/customhosting/vmm"	# Location of other ovs scripts
+PATH=$OVS_PROGS:$PATH				# Update $PATH for this switches context
 
 function print_usage {
   cat <<EOF
@@ -16,9 +18,9 @@ function print_usage {
 
   OPTIONS
     [-n <network>] 	Libvirt network name. Must be an openvswitch network
-    [-V, --version]	Shows the version information
-    [-h, --help]	Shows this message
-
+    [-V]		Shows the version information
+    [-h]		Shows this message
+    
 EOF
   exit 2
 }
@@ -94,10 +96,10 @@ if [ -n $NETWORK ] ; then
       if [ $? -eq 0 ]; then
 	# Default vlan = 1
 	VLANID="1"
-	echo -e "\t$VLANID\t\t$PORTGROUP"
+	echo -e "\t\"$VLANID\"\t\t$PORTGROUP"
       else
 	VLANID=$(sed -n "/<portgroup name='${PORTGROUP}'/,/<\/portgroup>/p" $DUMPFILE | grep "<tag id='" | awk -F\' '{print $2}')
-	echo -e "\t$VLANID\t\t$PORTGROUP"
+	echo -e "\t\"$VLANID\"\t\t$PORTGROUP"
       fi
     fi
   done

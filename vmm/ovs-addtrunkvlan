@@ -1,0 +1,197 @@
+#!/bin/bash
+
+PROGNAME="ovs-addtrunkvlan"
+REVISION="0.0.2"
+OVS_PROGS="~/Projects/customhosting/vmm"	# Location of other ovs scripts
+PATH=$OVS_PROGS:$PATH				# Update $PATH for this switches context
+
+function print_usage {
+  cat <<EOF
+  NAME
+    $PROGNAME - add vlans to openvswitch trunk portgroups
+
+  SYNOPSIS
+    $PROGNAME [-p <portgroup name>] [-n <network>] [-a <vlanid<,vlanid,..>>] [-c] [-V] [-h]
+
+  DESCRIPTION
+    Use to add a VLAN or VLANS to an existing trunk portgroup on an OpenVSwitch based Libvirt network.
+
+  OPTIONS
+    [-a <vlanid<,vlanid,..>>] 	Add VLAN or VLANS from trunk
+    [-p <portgroup>]		Name of the trunk Portgroup
+    [-n <network>] 		Libvirt network name
+    [-c]			Create the VLAN if it doesn't exist
+    [-V]			Shows the version information
+    [-h]			Shows this message
+
+EOF
+  exit 2
+}
+
+function print_version {
+  echo "$PROGNAME $REVISION"
+  echo "Ben Vincent - https://github.com/neoloc/customhosting"
+  exit 2
+}
+
+function print_gethelp {
+  echo ""
+  echo "Something went wrong, read the above message for more information."
+  echo "Additionally you can get help by running '$PROGNAME -h'"
+  exit 2
+}
+
+function set_network {
+  virsh net-info $TEMP_NETWORK > /dev/null 2>&1
+  if [ $? -eq 1 ]; then
+    echo "Network not found"
+    exit 1
+  elif [ -n "$(virsh net-dumpxml $TEMP_NETWORK | grep openvswitch)" ]; then
+    NETWORK=$TEMP_NETWORK
+  elif [ -z "$(virsh net-dumpxml $TEMP_NETWORK | grep openvswitch)" ]; then
+    echo "Network: $TEMP_NETWORK not an openvswitch network"
+    exit 1
+  else
+    echo "ERROR: Something went wrong, should not get here. Function 'set_network'"
+    exit 2
+  fi
+}
+
+function is_portgroup_a_trunk {
+  ovs-showtrunks -n $NETWORK | grep "\"$TEMP_PORTGROUP\""  > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    PORTGROUP=$TEMP_PORTGROUP
+  else
+    echo "The portgroup '$TEMP_PORTGROUP' is not a trunk"
+    exit 1
+  fi
+}
+
+function create_vlan_addlist {
+# Check VLANS to add don't exist
+ADDLIST=""
+EXISTLIST=""
+COUNT_ADD=0
+COUNT_EXIST=0
+CURRENTVLANS=$(ovs-showtrunks -n $NETWORK | grep "\"$PORTGROUP\"" |grep -Ev "(------------|PORTGROUP|$^|Available Trunks in network:)")
+for VLAN in $(echo "$TEMP_ADD" | tr "," "\n"); do
+  echo "$CURRENTVLANS" | awk '{print $2}' | tr "," "\n" | grep "\"$VLAN\""  > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    if [ $COUNT_EXIST -eq 0 ]; then
+      EXISTLIST="$VLAN"
+    else
+      EXISTLIST="$EXISTLIST,$VLAN"
+    fi
+  COUNT_EXIST=$[$COUNT_EXIST +1]
+  elif [ "$VLAN" = "1" ]; then
+    echo "VLAN: '$VLAN' is the default VLAN and already exists. Skipping."
+  else
+    if [ $COUNT_ADD -eq 0 ]; then
+      ADDLIST="$VLAN"
+    else
+      ADDLIST="$ADDLIST,$VLAN"
+    fi
+  COUNT_ADD=$[$COUNT_ADD +1]
+  fi
+done
+}
+
+function create_vlan_createlist {
+# Check VLANS to add need to be created
+CREATELIST=""
+SKIPLIST=""
+COUNT_SKIP=0
+COUNT_CREATE=0
+CURRENTVLANS=$(ovs-showvlans -n $NETWORK | grep -Ev '(--------|$^|VLANID|Available VLANS in network:)' | awk '{print $1}')
+for VLAN in $(echo $ADDLIST | tr "," "\n"); do
+  echo "$CURRENTVLANS" | grep "\"$VLAN\""  > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    if [ $COUNT_SKIP -eq 0 ]; then
+      SKIPLIST="$VLAN"
+    else
+      SKIPLIST="$SKIPLIST,$VLAN"
+    fi
+  COUNT_SKIP=$[$COUNT_SKIP +1]
+  else
+    if [ $COUNT_CREATE -eq 0 ]; then
+      CREATELIST="$VLAN"
+    else
+      CREATELIST="$CREATELIST,$VLAN"
+    fi
+  COUNT_CREATE=$[$COUNT_CREATE +1]
+  fi
+done
+}
+
+function bulk_add_vlans {
+  if [ "$CREATE_VLANS" = "false" ] && [ "$(echo "$CREATELIST" | wc -m)" = "1" ]; then
+    echo "No VLANs to create, moving on..."
+  elif [ $CREATE_VLANS = "true" ]; then
+    for VLAN in $(echo $CREATELIST | tr "," "\n"); do
+      ovs-addvlan -n $NETWORK -v $VLAN -p vlan${VLAN}
+    done
+  elif [ "$(echo "$CREATELIST" | wc -m)" != "1" ]; then
+    echo "Unable to continue as VLANS need to be created."; print_gethelp
+  else
+    echo "Something went wrong... Exiting!!!"
+    exit 1
+  fi
+}
+
+function create_xml {
+  XML="<portgroup name='${PORTGROUP}'><vlan trunk='yes'><tag id='1'/>"
+  LISTA=$(echo "$ADDLIST" | tr "," "\n")
+  LISTB=$(echo "$CURRENTVLANS" | awk -F\" '{print $2}')
+  SORTLIST=$(echo -e "$LISTA\n$LISTB" | sort -u)
+  for VLAN in $(echo "$SORTLIST" | tr " " "\n"); do
+    XML="$XML<tag id='$VLAN'/>"
+  done
+  XML="$XML</vlan></portgroup>"
+}
+
+function update_trunk_portgroup {
+  virsh net-update $NETWORK modify portgroup --xml "$XML" --live --config
+}
+
+# Check if there are any arguments
+if [[ $# -eq 0 ]]; then
+  echo "No arguments supplied"
+  print_gethelp
+  exit 1
+fi
+
+# Set some temporary variables
+TEMP_ADD="z"
+TEMP_PORTGROUP="z"
+CREATE_VLANS="false"
+
+# Get flags and options
+while getopts 'Vhcn:a:p:' flag; do
+  case "${flag}" in
+    a) TEMP_ADD="${OPTARG}";;
+    p) TEMP_PORTGROUP="${OPTARG}";;
+    n) TEMP_NETWORK="${OPTARG}";;
+    c) CREATE_VLANS="true";;
+    V) print_version ;;
+    h) print_usage ;;
+  esac
+done
+
+# Check the arguments were stored in the variables
+if [ "$TEMP_ADD" = "z" ]; then echo "You must specifiy a vlan to add"; print_gethelp; fi
+if [ "$TEMP_PORTGROUP" = "z" ]; then echo "ERROR: Portgroup not set."; print_gethelp; fi
+if [ "$TEMP_NETWORK" = "z" ]; then echo "ERROR: Network not set."; print_gethelp; fi
+
+# Process
+set_network
+is_portgroup_a_trunk
+create_vlan_addlist
+create_vlan_createlist
+create_xml
+bulk_add_vlans
+update_trunk_portgroup
+
+#if [ "$EXISTLIST" != "" ]; then echo "VLANS already in Trunk: $EXISTLIST"; fi
+#if [ "$ADDLIST" != "" ]; then echo "VLANS to ADD: $ADDLIST"; fi
+#if [ "$SKIPLIST" != "" ]; then echo "VLANS already Created: $EXISTLIST"; fi
+#if [ "$CREATELIST" != "" ]; then echo "VLANS to CREATE: $CREATELIST"; fi

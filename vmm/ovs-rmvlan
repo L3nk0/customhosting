@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROGNAME="ovs-addvlan"
+PROGNAME="ovs-rmvlan"
 REVISION="0.0.2"
 OVS_PROGS="~/Projects/customhosting/vmm"	# Location of other ovs scripts
 PATH=$OVS_PROGS:$PATH				# Update $PATH for this switches context
@@ -8,18 +8,17 @@ PATH=$OVS_PROGS:$PATH				# Update $PATH for this switches context
 function print_usage {
   cat <<EOF
   NAME
-    $PROGNAME - add vlan to openvswitch network
+    $PROGNAME - remove a portgroup from an openvswitch network
 
   SYNOPSIS
-    $PROGNAME [-n <name>] [-v <vlanid>] [-p <portgroup name>] [-V] [-h]
+    $PROGNAME [-n <name>] [-p <portgroup name>] [-V] [-h]
 
   DESCRIPTION
-    Use to create a VLAN based Portgroup on an OpenVSwitch based libvirt network
+    Use to remove a VLAN based Portgroup on an OpenVSwitch based libvirt network
 
   OPTIONS
     [-n <network>] 	Libvirt network name. Must be an openvswitch network
-    [-v <vlan>] 	VLAN ID to add to Libvirt network.
-    [-p <portgroup>]	Name of the Portgroup for the VLAN.
+    [-p <portgroup>]	Name of the Portgroup
     [-V]		Shows the version information
     [-h]		Shows this message
 
@@ -56,29 +55,46 @@ function set_network {
   fi
 }
 
-function set_vlan {
-  virsh net-dumpxml $TEMP_NETWORK | grep "tag id='${TEMP_VLAN}'" > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    echo "VLAN: $TEMP_VLAN on Network: $NETWORK already exists"
-    exit 1
-  elif [ $TEMP_VLAN -le 0 ] && [ $TEMP_VLAN -ge 4097 ]; then
-    echo "VLAN: $TEMP_VLAN on is outside the VLAN Specification range. 1 to 4096"
-    exit 1
-  elif [ $TEMP_VLAN -eq 1 ]; then
-    echo "VLAN: $TEMP_VLAN is the default vlan and already exists"
-    exit 1
-  else
-    VLAN=$TEMP_VLAN
-  fi
-}
-
 function set_portgroup {
-  virsh net-dumpxml $TEMP_NETWORK | grep "portgroup name='${TEMP_PORTGROUP}'" > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    echo "PortGroup: $TEMP_PORTGROUP on Network: $NETWORK already exists"
+  virsh net-dumpxml $NETWORK | grep "portgroup name='${TEMP_PORTGROUP}'" > /dev/null 2>&1
+  if [ $? -eq 1 ]; then
+    echo "PortGroup: '$TEMP_PORTGROUP' on Network: '$NETWORK' doesn't exist"
     exit 1
   else
   PORTGROUP=$TEMP_PORTGROUP
+  fi
+}
+
+function is_portgroup_not_a_trunk {
+  ovs-showtrunks -n $NETWORK | grep "\"$PORTGROUP\""  > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "The portgroup '$TEMP_PORTGROUP' is a trunk"
+    exit 1
+  fi
+}
+
+function get_vlan {
+  ovs-showvlans -n $NETWORK | grep "${PORTGROUP}$" > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    VLAN=$(ovs-showvlans -n $NETWORK | grep "${PORTGROUP}$" | awk -F\" '{print $2}')
+  fi
+}
+
+function gen_xml {
+  XML="<portgroup name='${PORTGROUP}'><vlan><tag id='${VLAN}'/></vlan></portgroup>"
+}
+
+function remove_portgroup {
+  if [ "$(echo $XML | wc -m)" = "57" ] || [ "$(echo $XML | wc -m)" = "1" ]; then
+    echo "XML is missing data, unable to process further. Exiting"
+    exit 1
+  else
+    virsh net-update $NETWORK delete portgroup --xml "$XML" --live --config
+    if [ $? -eq 0 ]; then
+      echo -e "\t --> VLAN '$VLAN' has been removed from portgroup '$PORTGROUP' on network '$NETWORK'"
+    else
+      echo "ERROR - VLAN '$VLAN' failed to be removed from portgroup '$PORTGROUP' on network '$NETWORK'"
+    fi
   fi
 }
 
@@ -91,14 +107,12 @@ fi
 
 # Set some temporary variables
 TEMP_NETWORK="z"
-TEMP_VLAN="z"
 TEMP_PORTGROUP="z"
 
 # Get flags and options
-while getopts 'Vhn:v:p:' flag; do
+while getopts 'Vhn:p:' flag; do
   case "${flag}" in
     n) TEMP_NETWORK="${OPTARG}";;
-    v) TEMP_VLAN="${OPTARG}";;
     p) TEMP_PORTGROUP="${OPTARG}";;
     V) print_version ;;
     h) print_usage ;;
@@ -107,18 +121,13 @@ done
 
 # Check the arguments were stored in the variables
 if [ "$TEMP_NETWORK" = "z" ]; then echo "ERROR: Network not set."; print_gethelp; fi
-if [ "$TEMP_VLAN" = "z" ]; then echo "ERROR: VLAN not set."; print_gethelp; fi
 if [ "$TEMP_PORTGROUP" = "z" ]; then echo "ERROR: Portgroup not set."; print_gethelp; fi
 
 # Process
 set_network
-set_vlan
 set_portgroup
-if [ -n $NETWORK ] && [ -n $VLAN ] && [ -n $PORTGROUP ]; then
-  virsh net-update $NETWORK add portgroup --xml "<portgroup name='${PORTGROUP}'><vlan><tag id='${VLAN}'/></vlan></portgroup>" --live --config
-  if [ $? -eq 0 ]; then
-    echo -e "\t --> VLAN '$VLAN' has been created as portgroup '$PORTGROUP' on network '$NETWORK'"
-  else
-    echo "ERROR - VLAN '$VLAN' failed to be created as portgroup '$PORTGROUP' on network '$NETWORK'"
-  fi
-fi
+is_portgroup_not_a_trunk
+get_vlan
+gen_xml
+remove_portgroup
+

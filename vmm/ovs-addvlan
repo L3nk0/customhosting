@@ -2,6 +2,8 @@
 
 PROGNAME="ovs-addvlan"
 REVISION="0.0.2"
+OVS_PROGS="~/Projects/customhosting/vmm"	# Location of other ovs scripts
+PATH=$OVS_PROGS:$PATH				# Update $PATH for this switches context
 
 function print_usage {
   cat <<EOF
@@ -12,14 +14,14 @@ function print_usage {
     $PROGNAME [-n <name>] [-v <vlanid>] [-p <portgroup name>] [-V] [-h]
 
   DESCRIPTION
-    Use to add a VLAN to an existing and active OpenVSwitch based Libvirt network.
+    Use to create a VLAN based Portgroup on an OpenVSwitch based libvirt network
 
   OPTIONS
     [-n <network>] 	Libvirt network name. Must be an openvswitch network
     [-v <vlan>] 	VLAN ID to add to Libvirt network.
     [-p <portgroup>]	Name of the Portgroup for the VLAN.
-    [-V, --version]	Shows the version information
-    [-h, --help]	Shows this message
+    [-V]		Shows the version information
+    [-h]		Shows this message
 
 EOF
   exit 2
@@ -113,10 +115,9 @@ set_network
 set_vlan
 set_portgroup
 if [ -n $NETWORK ] && [ -n $VLAN ] && [ -n $PORTGROUP ]; then
-  echo "All ok, ready to add the vlan"
   virsh net-update $NETWORK add portgroup --xml "<portgroup name='${PORTGROUP}'><vlan><tag id='${VLAN}'/></vlan></portgroup>" --live --config
   if [ $? -eq 0 ]; then
-    echo "INFO - VLAN '$VLAN' has been created as portgroup '$PORTGROUP' on network '$NETWORK'"
+    echo -e "\t --> VLAN '$VLAN' has been created as portgroup '$PORTGROUP' on network '$NETWORK'"
   else
     echo "ERROR - VLAN '$VLAN' failed to be created as portgroup '$PORTGROUP' on network '$NETWORK'"
   fi

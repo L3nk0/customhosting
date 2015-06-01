@@ -3,7 +3,7 @@
 PROGNAME="ovs-addtrunkvlan"
 REVISION="0.0.2"
 OVS_PROGS="~/Projects/customhosting/vmm"	# Location of other ovs scripts
-PATH=$OVS_PROGS:$PATH				# Update $PATH for this switches context
+PATH=$OVS_PROGS:$PATH				# Update $PATH for this scripts context
 
 function print_usage {
   cat <<EOF

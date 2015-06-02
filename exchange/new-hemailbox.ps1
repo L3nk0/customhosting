@@ -1,7 +1,7 @@
 PARAM(
-[STRING]$BusinessName=$(Read-Host -prompt "What is the customers Full Business Name? e.g. ExamplePtyLtd"),
-[STRING]$DisplayName=$(Read-Host -prompt "What is the DisplayName? e.g. 'Billy Bob' or 'Accounts @ Some Business'"),
-[STRING]$GivenName=$(Read-Host -prompt "What is the users name? e.g. 'Billy', 'Accounts' or 'Info'"),
+[STRING]$BusinessName=$(Read-Host -prompt "What is the customers Full Business Name? e.g. OneITServices"),
+[STRING]$DisplayName=$(Read-Host -prompt "What is the DisplayName? e.g. 'Billy Bob', 'Accounts @ Some Business'"),
+[STRING]$GivenName=$(Read-Host -prompt "What is the users name? e.g. Bill, Bob, Accounts, Info"),
 [STRING]$Surname,
 [STRING]$Password,
 [STRING]$DomainController,
@@ -153,6 +153,9 @@ function Generate-Username($ShortName, $GivenName, $Surname){
         $user=($ShortName + "." + $GivenName + "." + $Surname)
     }elseif($Surname -eq $null){
         $user=($shortName + "." + $GivenName)
+    }else{
+        LogMessage Error ("Something Failed in the Generate-Username function. Sec1")
+        Exit 1
     }
     if($user.length -ge "20"){
         $free="false"
@@ -168,7 +171,10 @@ function Generate-Username($ShortName, $GivenName, $Surname){
         }
     }elseif($user.length -lt "20"){
 		$finaluser=$user
-	}
+	}else{
+        LogMessage Error ("Something Failed in the Generate-Username function. Sec2")
+        Exit 1
+    }
     if($finaluser -ne ""){echo $finaluser}elseif($finaluser -eq ""){echo $false}
 }
 function Generate-UPN($Domain, $GivenName, $Surname){

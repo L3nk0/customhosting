@@ -166,7 +166,9 @@ function Generate-Username($ShortName, $GivenName, $Surname){
                 $count++
             }
         }
-    }
+    }elseif($user.length -lt "20"){
+		$finaluser=$user
+	}
     if($finaluser -ne ""){echo $finaluser}elseif($finaluser -eq ""){echo $false}
 }
 function Generate-UPN($Domain, $GivenName, $Surname){

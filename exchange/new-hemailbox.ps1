@@ -343,4 +343,4 @@ if($(readyToStart $BusinessName) -eq $true){
                 
     Remove-PSSession $Session
 }
-$allReports | ft
+$allReports | ft -AutoSize

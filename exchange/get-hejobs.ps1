@@ -72,37 +72,42 @@ function validateUUID{
         echo $false
     }
 }
-function processJob($jobtype, $uuid, $submitter){
-    $job=(Import-Csv ($wdir + $uuid + ".csv"))
-    if($jobtype -eq "new-heclient"){
-        $job | ForEach-Object{New-HECustomer -CustName $_.custname -CustShortName $_.custshortname -CustDomain $_.custdomain}
+function process_New-HEMailbox($Job){
+    $job | ForEach-Object{
+        if($_.surname -eq "#"){
+            New-HEMailbox -BusinessName $_.businessname -DisplayName $_.displayname -GivenName $_.givenname
+            if($?){
+                completeJob $uuid
+                emailNotify $submitter $uuid ("Task: " + $uuid + " has completed successfully. Client Mailbox " + $_.givenname + " for " + $_.custname + " has been setup successfully.")
+            }else{
+                logMessage error ("JobType:" + $jobtype + " with uuid:" + $uuid + " failed to create mailbox for " + $_.businessname)
+            }
+        }else{
+            New-HEMailbox -BusinessName $_.businessname -DisplayName $_.displayname -GivenName $_.givenname -Surname $_.surname
+            if($?){
+                completeJob $uuid
+                emailNotify $submitter $uuid ("Task: " + $uuid + " has completed successfully. Client Mailbox " + $_.givenname + "." + $_.surname + " for " + $_.custname + " has been setup successfully.")
+            }else{
+                logMessage error ("JobType:" + $jobtype + " with uuid:" + $uuid + " failed to create mailbox for " + $_.businessname)
+            }
+        }  
+    }
+}
+function process_New-HECustomer($Job){
+    $job | ForEach-Object{New-HECustomer -CustName $_.custname -CustShortName $_.custshortname -CustDomain $_.custdomain}
         if($?){
             completeJob $uuid
             emailNotify $submitter $uuid ("Task: " + $uuid + "has completed successfully. Client " + $_.custname + " has been setup successfully.")
         }else{
             logMessage error ("JobType:" + $jobtype + " with uuid:" + $uuid + " failed to create new customer" + $_.custname)
-        }
     }
-    elseif($jobtype -eq "new-hemailbox"){
-        $job | ForEach-Object{
-            if($_.surname -eq "#"){
-                New-HEMailbox -BusinessName $_.businessname -DisplayName $_.displayname -GivenName $_.givenname -Password $_.password
-                if($?){
-                    completeJob $uuid
-                    emailNotify $submitter $uuid ("Task: " + $uuid + " has completed successfully. Client Mailbox " + $_.givenname + " for " + $_.custname + " has been setup successfully.")
-                }else{
-                    logMessage error ("JobType:" + $jobtype + " with uuid:" + $uuid + " failed to create mailbox for " + $_.businessname)
-                    }
-            }else{
-                New-HEMailbox -BusinessName $_.businessname -DisplayName $_.displayname -GivenName $_.givenname -Surname $_.surname -Password $_.password
-                if($?){
-                    completeJob $uuid
-                    emailNotify $submitter $uuid ("Task: " + $uuid + " has completed successfully. Client Mailbox " + $_.givenname + "." + $_.surname + " for " + $_.custname + " has been setup successfully.")
-                }else{
-                    logMessage error ("JobType:" + $jobtype + " with uuid:" + $uuid + " failed to create mailbox for " + $_.businessname)
-                }
-            }  
-        }
+}
+function processJob($jobtype, $uuid, $submitter){
+    $job=(Import-Csv ($wdir + $uuid + ".csv"))
+    if(((Get-Command process_$jobtype).CommandType) -ne "Function"){
+        logMessage error ("JobType:" + $jobtype + " doesn't have a valid function associated with it")
+    }elseif(((Get-Command process_$jobtype).CommandType) -eq "Function"){
+        &process_$JobType $Job
     }
 }
 

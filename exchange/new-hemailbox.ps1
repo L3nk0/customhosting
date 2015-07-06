@@ -226,9 +226,9 @@ function Get-CustomerUPN($custName){
 }
 function Create-HEUserAccount($UserName, $UPN, $DisplayName, $Password, $GivenName, $Surname){
     if($Surname -ne $null){
-        New-ADUser -SamAccountName $UserName -UserPrincipalName $UPN -Name $UserName -GivenName $GivenName -Surname $Surname -DisplayName $DisplayName -Path $userOU -AccountPassword $(convertto-securestring $Password -asplaintext -force) -PasswordNeverExpires $True -Enabled $True -Server $hostedExchange_dchost  | out-file -Filepath $SessionTranscript -append
+        New-ADUser -SamAccountName $UserName -UserPrincipalName $UPN -Name $UserName -GivenName $GivenName -Surname $Surname -DisplayName $DisplayName -Company $BusinessName -Path $userOU -AccountPassword $(convertto-securestring $Password -asplaintext -force) -PasswordNeverExpires $True -Enabled $True -Server $hostedExchange_dchost  | out-file -Filepath $SessionTranscript -append
     }elseif($Surname -eq $null){
-        New-ADUser -SamAccountName $UserName -UserPrincipalName $UPN -Name $UserName -GivenName $GivenName -DisplayName $DisplayName -Path $userOU -AccountPassword $(convertto-securestring $Password -asplaintext -force) -PasswordNeverExpires $True -Enabled $True -Server $hostedExchange_dchost  | out-file -Filepath $SessionTranscript -append
+        New-ADUser -SamAccountName $UserName -UserPrincipalName $UPN -Name $UserName -GivenName $GivenName -DisplayName $DisplayName -Company $BusinessName -Path $userOU -AccountPassword $(convertto-securestring $Password -asplaintext -force) -PasswordNeverExpires $True -Enabled $True -Server $hostedExchange_dchost  | out-file -Filepath $SessionTranscript -append
     }
 }
 function Create-HEUserMailbox($UserName, $BusinessName){

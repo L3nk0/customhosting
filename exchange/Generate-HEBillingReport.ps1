@@ -1,4 +1,7 @@
-﻿# Import modules and snapins
+﻿PARAM(
+[STRING]$EmailReport
+)
+# Import modules and snapins
 if ( (Get-PSSnapin -Name Microsoft.Exchange.Management.PowerShell.E2010 -ErrorAction SilentlyContinue) -eq $null ){Add-PsSnapin Microsoft.Exchange.Management.PowerShell.E2010}
 if ( (Get-module -Name ActiveDirectory -ErrorAction SilentlyContinue) -eq $null ){Import-module ActiveDirectory}
 
@@ -9,10 +12,14 @@ $emailFrom = "billingreport@somedomain.com.au"
 $smtpserver = "somehost.somedomain.com.au"
 $subject = "Hosted Exchange customer/mailboxes/quota billing report"
 $body = "See attachment for details"
+$date = (Get-Date -UFormat "%Y-%m-%d")
+$csv = "c:\temp\HE_customer_details-$date.csv"
+# Costings
+$mbcost="20" # ExGST cost per mailbox in dollars
+$aqcost="5"  # ExGST cost per additional 1GB of quota in dollars
 
 # Functions
-function ConvertFrom-DN
-{
+function ConvertFrom-DN{
 param([string]$DN=(Throw '$DN is required!'))
     foreach ( $item in ($DN.replace('\,','~').split(",")))
     {
@@ -28,7 +35,6 @@ param([string]$DN=(Throw '$DN is required!'))
     $canoincal += $cn.ToString().replace('~',',')
     return $canoincal
 }
-
 Function Get-Increment([float] $value, [int] $increment){    
     if($value -gt 1)
     {
@@ -85,6 +91,14 @@ function Select-MyExchangeHost{
         echo $myEx
     }
 }
+function Output-Report{
+    if($EmailReport -eq $true){
+        $myCollection | Export-Csv $csv -NoTypeInformation
+        Send-MailMessage -To $emailTo -From $emailFrom -Subject $subject -SmtpServer $smtpserver -Body $body -Attachments $csv
+    }else{
+    echo ("All Quota's are shown in MegaBytes"); $myCollection | ft -autosize; echo ("Total Cost for all services exGST: $" + $myTotalCost); echo ("Total Number of Mailboxes: " + $myTotalMBCount)
+    } 
+}
 
 # Dynamic Global Variables
 #
@@ -106,40 +120,60 @@ $csv = "c:\temp\HE_customer_details-$date.csv"
 #
 # Create an array where all the report's objects are stored 
 $myCollection = @()
+$myTotal = 0
 #
 # Processing
 $subous = "Contacts","Groups","ResourceMailboxes","SharedMailboxes","Users"
 $customers = Get-ADOrganizationalUnit -Searchbase $hostedexchange_baseDN -SearchScope 1 -Filter *
 foreach($customer in $customers){
-    $custname = $($customer).Name
-    $custou = $hostedExchange_baseOU + "/" + $custname
-    $count = 0
-    $quota = 0
-    foreach($subou in $subous){
-        $currentOU = $custou + "/" + $subou
-        $mailboxes = Get-Mailbox -OrganizationalUnit $currentOU
-        foreach($mailbox in $mailboxes){
-            $count = $count + 1
-            $quota = $quota + $(Get-MailboxStatistics $mailbox | select @{label="quota";expression={$_.TotalItemSize.Value.ToMB()}}).quota
-        }
+        $custname = $($customer).Name
+        $custou = $hostedExchange_baseOU + "/" + $custname
+        $count = 0
+        $quota = 0
+        foreach($subou in $subous){
+            $currentOU = $custou + "/" + $subou
+            $mailboxes = Get-Mailbox -OrganizationalUnit $currentOU
+            foreach($mailbox in $mailboxes){
+                $count = $count + 1
+                $quota = $quota + $(Get-MailboxStatistics $mailbox | select @{label="quota";expression={$_.TotalItemSize.Value.ToMB()}}).quota
+            }
         
-    }
-    $allocatedQuota = ""
-    if($($count * 2048 -le $(Get-Increment -value $quota -increment 2048))){$allocatedQuota = $(Get-Increment -value $quota -increment 2048)}else{$allocatedQuota = $count * 2048}
-    $diffQuota = $allocatedQuota - $($count *2048)
-
-    # Define the attributes of the object
-    $myobj = "" | select customer,mailboxCount,usedQuota,allocatedQuota,additionalQuota
+        }
+        $allocatedQuota = ""
     
-    # Attach values to the object attributes
-    $myobj.customer = $custname
-    $myobj.mailboxCount = $count
-    $myobj.usedQuota = $quota
-    $myobj.allocatedQuota = $allocatedQuota
-    $myobj.additionalQuota = $diffQuota
+        if($($count * 2048 -le $(Get-Increment -value $quota -increment 2048))){
+            $allocatedQuota = $(Get-Increment -value $quota -increment 2048)
+        }else{
+            $allocatedQuota = $count * 2048
+        }
+    
+        $poolquota = ($count * 2048)
+        $diffQuota = $allocatedQuota - $poolquota
 
-    # Add the object to the array
-    $myCollection += $myobj
+        # Generate the costings
+        $additionalQuotaCost=(($diffQuota/1024)*$aqcost)
+        $baseCost=(($count)*$mbcost)
+        $totalCost=($additionalQuotaCost + $baseCost)
+        $myTotalCost=($totalCost + $myTotalCost)
+
+        # Total MailboxCount
+        $myTotalMBCount=($count + $myTotalMBCount)
+    
+        # Define the attributes of the object
+        $myobj = "" | select Customer,Mailboxes,PoolQuota,QuotaUsed,ExtraQuota,BaseCost,ExtraQuotaCost,TotalCost
+    
+        # Attach values to the object attributes
+        $myobj.Customer = $custname
+        $myobj.Mailboxes = $count
+        $myobj.PoolQuota = $poolquota
+        $myobj.QuotaUsed = $quota
+        $myobj.ExtraQuota = $diffQuota
+        $myobj.BaseCost = ("$" + $baseCost)
+        $myobj.ExtraQuotaCost = ("$" + $additionalQuotaCost)
+        $myobj.TotalCost = ("$" + $totalCost)
+
+        # Add the object to the array
+        $myCollection += $myobj
 }
 
-$myCollection | ft
+Output-Report

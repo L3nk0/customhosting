@@ -1,4 +1,10 @@
-﻿PARAM(
+﻿# This script with generate a report based on pooled quota.
+# e.g.
+# Each mailbox sold comes with 2GB of storage. Customer A has 10 mailboxes which gives them 20GB's of 
+# pooled quota. If User 1 at Customer A uses more than 2GB of storage, as long as the organisation is
+# below the pooled quota limit, no additional charges will be added.
+#
+PARAM(
 [STRING]$EmailReport
 )
 # Import modules and snapins

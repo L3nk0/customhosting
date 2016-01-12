@@ -76,7 +76,7 @@ function validateCustomerShortname($newCustShortName){
 function validateCustomerDomain($newCustDomain){
     $failADCount="0"
     $failTLDCount="0"
-    $tlds=".com",".org",".net",".edu",".asn",".co.uk",".co.nz",".info",".biz",".com.au",".net.au",".org.au",".edu.au",".asn.au"
+    $tlds=".com",".org",".net",".edu",".asn",".co.uk",".co.nz",".info",".biz",".com.au",".net.au",".org.au",".edu.au",".asn.au","id.au"
     $tlds | foreach-object{
         if($newCustDomain -like "*$_"){
             $failTLDCount="1"
@@ -231,27 +231,27 @@ if($(readyToStart $BusinessName $ShortName $EmailDomainName) -eq $true){
         createCustomerAttributes $BusinessName $ShortName $EmailDomainName
         # -- Accepted Domain
 	    createAcceptedDomain $EmailDomainName
-        createDelay 10
+        createDelay 20
         # -- Email Address Policies
         createEmailAddressPolicies $BusinessName $EmailDomainName
-        createDelay 10
+        createDelay 20
         # -- Address Lists
         createAddressLists $BusinessName
-        createDelay 10
+        createDelay 20
         # -- Global Address List
         createCustomerGAL $BusinessName
-        createDelay 10
+        createDelay 20
         # -- OAB
         createCustomerOAB $BusinessName
-        createDelay 10
+        createDelay 20
         # -- Address Book Policy
         createCustomerABP $BusinessName
-        createDelay 10
+        createDelay 20
         # -- Update Email Address Policies
-        createDelay 10
+        createDelay 20
         updateEmailAddressPolicies $BusinessName
         # -- Update Address Lists
-        createDelay 10
+        createDelay 20
         updateAddressLists $BusinessName
     Remove-PSSession $Session
 }

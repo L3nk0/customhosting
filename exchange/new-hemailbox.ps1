@@ -232,7 +232,7 @@ function Create-HEUserAccount($UserName, $UPN, $DisplayName, $Password, $GivenNa
     }
 }
 function Create-HEUserMailbox($UserName, $BusinessName){
-    Enable-mailbox $UserName -AddressBookPolicy $BusinessName -Database MailboxStore1 -Alias $UserName -DomainController $hostedExchange_dchost  | out-file -Filepath $SessionTranscript -append
+    Enable-mailbox $UserName -AddressBookPolicy $BusinessName -Database MailboxStore2 -Alias $UserName -DomainController $hostedExchange_dchost  | out-file -Filepath $SessionTranscript -append
 }
 function readyToStart($BusinessName){
     if((Check-CustomerExists $BusinessName) -eq "True"){
